@@ -55,13 +55,31 @@ The build is signed ad-hoc, not notarised. If Gatekeeper blocks it, right-click
 
 ### Launch at login
 
-System Settings → General → Login Items → **+** → pick `GestureBind.app`.
+Menu bar icon → **Launch at Login**, or the checkbox at the bottom of Settings. Either
+registers the bundle with `SMAppService`, and it then appears in
+System Settings → General → Login Items where you can revoke it independently.
+
+It can also be driven headlessly, which is handy from a setup script:
+
+```bash
+GestureBind.app/Contents/MacOS/GestureBind --login-item on      # or: off, status
+```
+
+**Registration records the app's current path.** Move or rename `GestureBind.app` and the
+login item silently stops working — toggle it off and on again afterwards. Because of
+that, put the app where it's going to live *before* enabling this; `/Applications` is the
+safe choice, and it's also the location least likely to have macOS refuse registration
+outright.
+
+Since the app is a login item and not in the Dock, the only sign it's running is the menu
+bar icon. If gestures stop working after a reboot, check there first.
 
 ## Using it
 
 Click the menu bar icon:
 
 - **Gestures Enabled** — master switch, for when a gesture is fighting you
+- **Launch at Login** — start GestureBind automatically at boot
 - **Settings…** — the binding editor
 - **Quit GestureBind**
 
@@ -116,6 +134,8 @@ trackpad ──> MultitouchSupport.swift ──> Recognizer ──> Engine ─�
   JSON format carries a `kind` discriminator so new gesture and action types can be added
   without invalidating existing configs.
 - `Sources/Store.swift` — persistence and lookup.
+- `Sources/LoginItem.swift` — `SMAppService` registration, re-read on every menu open so a
+  revocation made in System Settings is reflected rather than cached.
 - `Sources/SettingsView.swift`, `Sources/main.swift` — SwiftUI editor and menu bar agent.
 
 ### A note on the private framework

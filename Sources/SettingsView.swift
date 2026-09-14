@@ -3,6 +3,7 @@ import SwiftUI
 struct SettingsView: View {
     @ObservedObject var store = Store.shared
     @ObservedObject var engine = Engine.shared
+    @ObservedObject var loginItem = LoginItem.shared
     @State private var selection: Binding.ID?
 
     private var selectedIndex: Int? {
@@ -89,7 +90,11 @@ struct SettingsView: View {
 
     private var statusBar: some View {
         HStack {
-            if let error = engine.startupError {
+            if let error = loginItem.lastError {
+                Label(error, systemImage: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.orange)
+                    .lineLimit(2)
+            } else if let error = engine.startupError {
                 Label(error, systemImage: "exclamationmark.triangle.fill")
                     .foregroundStyle(.orange)
             } else if let last = engine.lastGesture {
@@ -98,6 +103,11 @@ struct SettingsView: View {
                 Text("Waiting for a gesture…").foregroundStyle(.secondary)
             }
             Spacer()
+            Toggle("Launch at login", isOn: SwiftUI.Binding(
+                get: { loginItem.isEnabled },
+                set: { loginItem.setEnabled($0) }
+            ))
+            .toggleStyle(.checkbox)
             Button("Reveal config") { store.revealConfigInFinder() }
                 .buttonStyle(.link)
         }

@@ -34,6 +34,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         menu.addItem(.separator())
 
+        let launchAtLogin = NSMenuItem(
+            title: "Launch at Login",
+            action: #selector(toggleLaunchAtLogin),
+            keyEquivalent: ""
+        )
+        launchAtLogin.target = self
+        launchAtLogin.tag = 2
+        menu.addItem(launchAtLogin)
+
+        menu.addItem(.separator())
+
         let settings = NSMenuItem(
             title: "Settings…",
             action: #selector(openSettings),
@@ -49,6 +60,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func toggleEnabled() {
         Store.shared.isEnabled.toggle()
+    }
+
+    @objc private func toggleLaunchAtLogin() {
+        LoginItem.shared.toggle()
+        if let error = LoginItem.shared.lastError { presentError(error) }
+    }
+
+    private func presentError(_ message: String) {
+        let alert = NSAlert()
+        alert.messageText = "Launch at Login"
+        alert.informativeText = message
+        alert.alertStyle = .warning
+        NSApp.activate(ignoringOtherApps: true)
+        alert.runModal()
     }
 
     @objc private func openSettings() {
@@ -73,7 +98,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 extension AppDelegate: NSMenuDelegate {
     func menuNeedsUpdate(_ menu: NSMenu) {
         menu.item(withTag: 1)?.state = Store.shared.isEnabled ? .on : .off
+        // The user can revoke the login item in System Settings at any time,
+        // so re-read the real status each time the menu opens.
+        LoginItem.shared.refresh()
+        menu.item(withTag: 2)?.state = LoginItem.shared.isEnabled ? .on : .off
     }
+}
+
+// Headless control of the login item, so it can be scripted or tested without
+// opening the menu: `GestureBind.app/Contents/MacOS/GestureBind --login-item on|off|status`
+if let flagIndex = CommandLine.arguments.firstIndex(of: "--login-item") {
+    let argument = CommandLine.arguments.indices.contains(flagIndex + 1)
+        ? CommandLine.arguments[flagIndex + 1]
+        : "status"
+    switch argument {
+    case "on":  LoginItem.shared.setEnabled(true)
+    case "off": LoginItem.shared.setEnabled(false)
+    default:    LoginItem.shared.refresh()
+    }
+    if let error = LoginItem.shared.lastError {
+        FileHandle.standardError.write((error + "\n").data(using: .utf8)!)
+        exit(1)
+    }
+    print("launch at login: \(LoginItem.shared.isEnabled ? "enabled" : "disabled")")
+    exit(0)
 }
 
 let app = NSApplication.shared

@@ -11,7 +11,7 @@ mkdir -p "$APP/Contents/MacOS"
 
 swiftc -O \
   -target "${ARCH}-apple-macos13.0" \
-  -framework AppKit -framework SwiftUI \
+  -framework AppKit -framework SwiftUI -framework ServiceManagement \
   -o "$APP/Contents/MacOS/GestureBind" \
   Sources/*.swift
 
