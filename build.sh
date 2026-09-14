@@ -17,10 +17,20 @@ swiftc -O \
 
 cp Info.plist "$APP/Contents/Info.plist"
 
-# An ad-hoc signature gives the bundle a stable identity, so macOS keeps the
-# Accessibility and Screen Recording permissions across rebuilds instead of
-# asking for them again every time.
-codesign --force --sign - --identifier com.gesturebind.app "$APP" >/dev/null 2>&1 \
-  || echo "warning: ad-hoc codesign failed; permissions may reset on each rebuild"
+# Sign with a stable identity if one exists. This is what keeps the Screen Recording
+# and Accessibility grants alive across rebuilds: a certificate gives the bundle a
+# designated requirement of "identifier + certificate leaf", whereas an ad-hoc signature
+# has no team identifier and forces macOS to key permissions to the binary's cdhash --
+# which changes every single build, so every build has to be re-granted by hand.
+IDENTITY="GestureBind Local Dev"
+if security find-identity -v -p codesigning 2>/dev/null | grep -q "$IDENTITY"; then
+  codesign --force --sign "$IDENTITY" --identifier com.gesturebind.app "$APP"
+else
+  codesign --force --sign - --identifier com.gesturebind.app "$APP" >/dev/null 2>&1 || true
+  cat >&2 <<'WARN'
+warning: signed ad-hoc. macOS will ask for Screen Recording and Accessibility again
+         after every rebuild. Run ./make-signing-identity.sh once to stop that.
+WARN
+fi
 
 echo "Built $APP"

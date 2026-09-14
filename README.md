@@ -21,12 +21,38 @@ Out of the box:
 ## Setup
 
 ```bash
-./build.sh          # produces GestureBind.app in this directory
+./make-signing-identity.sh   # once, ever — see below for why this matters
+./build.sh                   # produces GestureBind.app in this directory
 open GestureBind.app
 ```
 
 The app has no Dock icon. It appears as a hand icon in the menu bar; that menu is
 where you'll find Settings and Quit.
+
+### Why `make-signing-identity.sh` comes first
+
+An ad-hoc signature (`codesign -s -`) has no team identifier, so macOS has nothing stable
+to attach a permission grant to and falls back to keying it on the **cdhash of the
+binary**. That changes on every single build. The result is the worst kind of bug: after
+any rebuild the app looks brand new to TCC, so gestures silently stop working and macOS
+re-prompts for permissions it appears to already have — System Settings will even show
+GestureBind switched on while the running copy is denied.
+
+`make-signing-identity.sh` creates a self-signed certificate in your login keychain once.
+The bundle then gets a designated requirement of `identifier + certificate leaf`, which
+does not change when the code does, and permissions survive rebuilds. Confirm with:
+
+```bash
+codesign -d -r- GestureBind.app     # should print a certificate leaf, not a cdhash
+```
+
+If you ever do hit the re-prompt loop, clear the stale grants and start over:
+
+```bash
+tccutil reset ScreenCapture com.gesturebind.app
+tccutil reset Accessibility com.gesturebind.app
+tccutil reset ListenEvent  com.gesturebind.app
+```
 
 ### Grant every permission macOS asks for
 
@@ -50,7 +76,7 @@ app keeps behaving as if it were still denied.
 
 ### If macOS refuses to open the app
 
-The build is signed ad-hoc, not notarised. If Gatekeeper blocks it, right-click
+The build is signed with a local self-signed certificate, not notarised. If Gatekeeper blocks it, right-click
 `GestureBind.app` → **Open** → **Open**, once.
 
 ### Launch at login
@@ -134,6 +160,9 @@ trackpad ──> MultitouchSupport.swift ──> Recognizer ──> Engine ─�
   JSON format carries a `kind` discriminator so new gesture and action types can be added
   without invalidating existing configs.
 - `Sources/Store.swift` — persistence and lookup.
+- `build.sh`, `make-signing-identity.sh` — build and local signing. Read the comments in
+  both before changing how the app is signed; the signing mode directly determines whether
+  permissions survive a rebuild.
 - `Sources/LoginItem.swift` — `SMAppService` registration, re-read on every menu open so a
   revocation made in System Settings is reflected rather than cached.
 - `Sources/SettingsView.swift`, `Sources/main.swift` — SwiftUI editor and menu bar agent.
